@@ -10,7 +10,7 @@ import Control.Monad.Eff.Exception (message)
 import Data.Either (Either(..), either)
 import Data.Functor (voidRight)
 import Data.Maybe (maybe)
-import Expr (Expr(..))
+import Expr (Binding(..), Expr(..), Prim1(..))
 import Node.Buffer (BUFFER, Buffer, toString)
 import Node.ChildProcess (CHILD_PROCESS, defaultExecOptions, exec)
 import Node.Encoding (Encoding(..))
@@ -39,12 +39,14 @@ logA = liftEff <<< log
 toStringA :: forall eff. Buffer -> Aff ( buffer :: BUFFER | eff) String
 toStringA = liftEff <<< toString UTF8
 
-compileA :: forall eff. Expr -> Aff ( process :: PROCESS, console :: CONSOLE | eff ) String
+compileA :: forall eff a. Expr a -> Aff ( process :: PROCESS, console :: CONSOLE | eff ) String
 compileA expr = either (\err -> (logA err) *> (exitA 1)) pure (compileProg expr)
 
 main :: forall e. Eff ( buffer :: BUFFER, process :: PROCESS, cp :: CHILD_PROCESS, console :: CONSOLE, fs :: FS | e) Unit
 main = runAff_ (either printError printSuccess) $ do
-  let expr = Let "x" (Sub1 (Number 5)) (Add1 (Add1 (Identifier "x")))
+  -- let expr = Let (Binding "x" (Sub1 (Number 5 unit) unit) unit) (Add1 (Add1 (Identifier "x" unit) unit) unit) unit
+  let expr = If (EPrim1 Sub1 (Number 2 unit) unit) (Number 10 unit) (Number 20 unit) unit
+  -- let expr = Crash 5 unit
   compiled <- compileA expr
   _ <- writeTextFile UTF8 "./compiled.s" compiled `catchError` logAndExit
   _ <- logA "Compiled!"
